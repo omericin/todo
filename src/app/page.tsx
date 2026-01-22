@@ -662,7 +662,7 @@ export default function TodoApp() {
                         onClick={() => setNoteColor(color)}
                         className={cn(
                           "w-6 h-6 rounded-full border-2 transition-all",
-                          color.split(" ")[1],
+                          color,
                           noteColor === color ? "border-primary scale-110 shadow-lg" : "border-transparent hover:scale-105"
                         )}
                       />
