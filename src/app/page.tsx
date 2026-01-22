@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,7 @@ export default function TodoApp() {
   const [showDetailsInput, setShowDetailsInput] = useState(false);
   const [priority, setPriority] = useState<Priority>("medium");
   const [mounted, setMounted] = useState(false);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   useEffect(() => {
     const savedTodos = localStorage.getItem("todos");
@@ -94,6 +95,10 @@ export default function TodoApp() {
 
   const pendingCount = todos.filter(t => !t.completed).length;
 
+  const visibleTodos = hideCompleted
+    ? todos.filter(t => !t.completed)
+    : todos;
+
   if (!mounted) {
     return null; // Prevents hydration error
   }
@@ -114,9 +119,33 @@ export default function TodoApp() {
                 </CardDescription>
               </div>
             </div>
-            <span className="text-sm text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
-              {pendingCount} pending
-            </span>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHideCompleted(!hideCompleted)}
+                className={cn(
+                  "hidden sm:flex h-8 text-xs font-medium border-primary/20 hover:bg-primary/5",
+                  hideCompleted && "bg-primary/10 text-primary border-primary/30"
+                )}
+              >
+                {hideCompleted ? (
+                  <>
+                    <EyeOff className="w-3.5 h-3.5 mr-1.5" />
+                    Show All
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3.5 h-3.5 mr-1.5" />
+                    Hide Done
+                  </>
+                )}
+              </Button>
+              <span className="text-sm text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
+                {pendingCount} pending
+              </span>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6 flex-1 flex flex-col min-h-0">
@@ -160,26 +189,39 @@ export default function TodoApp() {
               )}
             </div>
 
-            <div className="flex items-center gap-4 px-1">
-              <span className="text-sm text-muted-foreground font-medium">Priority:</span>
-              <RadioGroup
-                value={priority}
-                onValueChange={(v) => setPriority(v as Priority)}
-                className="flex items-center gap-4"
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground font-medium">Priority:</span>
+                <RadioGroup
+                  value={priority}
+                  onValueChange={(v) => setPriority(v as Priority)}
+                  className="flex items-center gap-4"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="low" id="low" className="text-blue-500 border-blue-200 dark:border-blue-800" />
+                    <Label htmlFor="low" className="text-sm font-normal cursor-pointer">Low</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="medium" id="medium" className="text-yellow-500 border-yellow-200 dark:border-yellow-800" />
+                    <Label htmlFor="medium" className="text-sm font-normal cursor-pointer">Medium</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="high" id="high" className="text-red-500 border-red-200 dark:border-red-800" />
+                    <Label htmlFor="high" className="text-sm font-normal cursor-pointer">High</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Mobile toggle button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHideCompleted(!hideCompleted)}
+                className="sm:hidden h-8 w-8 p-0"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="low" id="low" className="text-blue-500 border-blue-200 dark:border-blue-800" />
-                  <Label htmlFor="low" className="text-sm font-normal cursor-pointer">Low</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="medium" id="medium" className="text-yellow-500 border-yellow-200 dark:border-yellow-800" />
-                  <Label htmlFor="medium" className="text-sm font-normal cursor-pointer">Medium</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="high" id="high" className="text-red-500 border-red-200 dark:border-red-800" />
-                  <Label htmlFor="high" className="text-sm font-normal cursor-pointer">High</Label>
-                </div>
-              </RadioGroup>
+                {hideCompleted ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="sr-only">Toggle completed tasks</span>
+              </Button>
             </div>
           </form>
 
@@ -191,8 +233,15 @@ export default function TodoApp() {
                 </div>
                 <p className="text-lg font-medium">No tasks yet. Start by adding one!</p>
               </div>
+            ) : visibleTodos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground/50 space-y-4">
+                <div className="w-16 h-16 rounded-full bg-secondary/30 flex items-center justify-center">
+                  <EyeOff className="w-8 h-8 opacity-20" />
+                </div>
+                <p className="text-sm font-medium">Completed tasks are hidden.</p>
+              </div>
             ) : (
-              todos.map((todo) => (
+              visibleTodos.map((todo) => (
                 <Collapsible key={todo.id} className={cn(
                   "group rounded-xl border transition-all duration-300 animate-in slide-in-from-bottom-2 fade-in",
                   todo.completed
