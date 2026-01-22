@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -33,6 +33,11 @@ export default function TodoApp() {
   const [mounted, setMounted] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
 
+  // Water Tracker State
+  const [waterCount, setWaterCount] = useState(0);
+  const DAILY_GOAL = 5;
+
+  // Load Todos
   useEffect(() => {
     const savedTodos = localStorage.getItem("todos");
     if (savedTodos) {
@@ -46,14 +51,43 @@ export default function TodoApp() {
         console.error("Failed to load todos", e);
       }
     }
+
+    // Load Water Data
+    const savedWater = localStorage.getItem("dailyWater");
+    if (savedWater) {
+      try {
+        const { date, count } = JSON.parse(savedWater);
+        const today = new Date().toISOString().split('T')[0];
+
+        if (date === today) {
+          setWaterCount(count);
+        } else {
+          // Reset if different day
+          setWaterCount(0);
+          localStorage.setItem("dailyWater", JSON.stringify({ date: today, count: 0 }));
+        }
+      } catch (e) {
+        console.error("Failed to load water", e);
+      }
+    }
+
     setMounted(true);
   }, []);
 
+  // Save Todos
   useEffect(() => {
     if (mounted) {
       localStorage.setItem("todos", JSON.stringify(todos));
     }
   }, [todos, mounted]);
+
+  // Save Water
+  useEffect(() => {
+    if (mounted) {
+      const today = new Date().toISOString().split('T')[0];
+      localStorage.setItem("dailyWater", JSON.stringify({ date: today, count: waterCount }));
+    }
+  }, [waterCount, mounted]);
 
   const addTodo = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -113,8 +147,9 @@ export default function TodoApp() {
                 <Layout className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-2xl font-bold tracking-tight">Tasks</CardTitle>
-                <CardDescription>
+                {/* Reduced: text-2xl -> text-xl */}
+                <CardTitle className="text-xl font-bold tracking-tight">Tasks</CardTitle>
+                <CardDescription className="text-xs">
                   Manage your daily tasks with focus and clarity.
                 </CardDescription>
               </div>
@@ -142,7 +177,8 @@ export default function TodoApp() {
                   </>
                 )}
               </Button>
-              <span className="text-sm text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
+              {/* Reduced: text-sm -> text-xs */}
+              <span className="text-xs text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
                 {pendingCount} pending
               </span>
             </div>
@@ -157,7 +193,8 @@ export default function TodoApp() {
                     placeholder="Add a new task..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    className="h-11 pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all font-medium"
+                    // Reduced: font-medium -> text-sm
+                    className="h-10 text-sm pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all"
                   />
                 </div>
                 <Button
@@ -165,16 +202,16 @@ export default function TodoApp() {
                   draggable={false}
                   onClick={() => setShowDetailsInput(!showDetailsInput)}
                   variant={showDetailsInput ? "secondary" : "outline"}
-                  className="h-11 px-3 border-primary/20"
+                  className="h-10 px-3 border-primary/20"
                 >
-                  <AlignLeft className="w-5 h-5" />
+                  <AlignLeft className="w-4 h-4" />
                 </Button>
                 <Button
                   type="submit"
                   disabled={!input.trim()}
-                  className="h-11 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 transition-all px-6 shrink-0"
+                  className="h-10 text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 transition-all px-4 shrink-0"
                 >
-                  <Plus className="w-5 h-5 mr-2" />
+                  <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
               </div>
@@ -184,14 +221,16 @@ export default function TodoApp() {
                   placeholder="Add details (optional)..."
                   value={details}
                   onChange={(e) => setDetails(e.target.value)}
-                  className="min-h-[80px] border-primary/20 resize-none animate-in slide-in-from-top-2 fade-in duration-200"
+                  // Reduced: text-sm added
+                  className="min-h-[80px] text-sm border-primary/20 resize-none animate-in slide-in-from-top-2 fade-in duration-200"
                 />
               )}
             </div>
 
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground font-medium">Priority:</span>
+                {/* Reduced: text-sm -> text-xs */}
+                <span className="text-xs text-muted-foreground font-medium">Priority:</span>
                 <RadioGroup
                   value={priority}
                   onValueChange={(v) => setPriority(v as Priority)}
@@ -199,15 +238,16 @@ export default function TodoApp() {
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="low" id="low" className="text-blue-500 border-blue-200 dark:border-blue-800" />
-                    <Label htmlFor="low" className="text-sm font-normal cursor-pointer">Low</Label>
+                    {/* Reduced: text-sm -> text-xs */}
+                    <Label htmlFor="low" className="text-xs font-normal cursor-pointer">Low</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="medium" id="medium" className="text-yellow-500 border-yellow-200 dark:border-yellow-800" />
-                    <Label htmlFor="medium" className="text-sm font-normal cursor-pointer">Medium</Label>
+                    <Label htmlFor="medium" className="text-xs font-normal cursor-pointer">Medium</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="high" id="high" className="text-red-500 border-red-200 dark:border-red-800" />
-                    <Label htmlFor="high" className="text-sm font-normal cursor-pointer">High</Label>
+                    <Label htmlFor="high" className="text-xs font-normal cursor-pointer">High</Label>
                   </div>
                 </RadioGroup>
               </div>
@@ -231,14 +271,14 @@ export default function TodoApp() {
                 <div className="w-20 h-20 rounded-full bg-secondary/50 flex items-center justify-center">
                   <Check className="w-10 h-10 opacity-20" />
                 </div>
-                <p className="text-lg font-medium">No tasks yet. Start by adding one!</p>
+                <p className="text-base font-medium">No tasks yet. Start by adding one!</p>
               </div>
             ) : visibleTodos.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground/50 space-y-4">
                 <div className="w-16 h-16 rounded-full bg-secondary/30 flex items-center justify-center">
                   <EyeOff className="w-8 h-8 opacity-20" />
                 </div>
-                <p className="text-sm font-medium">Completed tasks are hidden.</p>
+                <p className="text-xs font-medium">Completed tasks are hidden.</p>
               </div>
             ) : (
               visibleTodos.map((todo) => (
@@ -252,21 +292,24 @@ export default function TodoApp() {
                     <Checkbox
                       checked={todo.completed}
                       onCheckedChange={() => toggleTodo(todo.id)}
-                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-6 h-6 transition-transform active:scale-95 shrink-0"
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-5 h-5 transition-transform active:scale-95 shrink-0"
                     />
 
                     <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2 overflow-hidden">
                       <span className={cn(
-                        "text-base font-medium transition-all truncate flex-1",
+                        // Reduced: text-base -> text-sm
+                        "text-sm font-medium transition-all truncate flex-1",
                         todo.completed && "text-muted-foreground line-through decoration-primary/30"
                       )}>
                         {todo.text}
                       </span>
                       <div className="flex items-center gap-3 shrink-0">
-                        <Badge variant="outline" className={cn("font-normal border", getPriorityColor(todo.priority))}>
+                        {/* Reduced: default badge size, ensured font-normal */}
+                        <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 font-normal border", getPriorityColor(todo.priority))}>
                           {todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1)}
                         </Badge>
-                        <span className="text-xs text-muted-foreground flex items-center gap-1 min-w-[80px] justify-end">
+                        {/* Reduced: text-xs -> text-[10px] */}
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 min-w-[80px] justify-end">
                           <Calendar className="w-3 h-3" />
                           {todo.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
@@ -276,8 +319,8 @@ export default function TodoApp() {
                     <div className="flex items-center gap-1">
                       {todo.details && (
                         <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
-                            <ChevronDown className="w-4 h-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                            <ChevronDown className="w-3 h-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
                             <span className="sr-only">Toggle details</span>
                           </Button>
                         </CollapsibleTrigger>
@@ -287,9 +330,9 @@ export default function TodoApp() {
                         variant="ghost"
                         size="icon"
                         onClick={() => deleteTodo(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-9 w-9 transition-all"
+                        className="opacity-0 group-hover:opacity-100 text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8 transition-all"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                         <span className="sr-only">Delete</span>
                       </Button>
                     </div>
@@ -298,7 +341,8 @@ export default function TodoApp() {
                   {todo.details && (
                     <CollapsibleContent>
                       <div className="px-4 pb-4 pl-14 pt-0">
-                        <div className="text-sm text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-border/50">
+                        {/* Reduced: text-sm -> text-xs */}
+                        <div className="text-xs text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-border/50">
                           {todo.details}
                         </div>
                       </div>
@@ -309,6 +353,35 @@ export default function TodoApp() {
             )}
           </div>
         </CardContent>
+        <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-blue-500/10 rounded-lg">
+              <GlassWater className="w-4 h-4 text-blue-500" />
+            </div>
+            <div>
+              {/* Reduced: text-sm -> text-xs, text-xs -> text-[10px] */}
+              <p className="text-xs font-semibold">Hydration Tracker</p>
+              <p className="text-[10px] text-muted-foreground">{waterCount}/{DAILY_GOAL} glasses today</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: DAILY_GOAL }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setWaterCount(i + 1)}
+                className={cn(
+                  "p-1.5 rounded-lg transition-all hover:scale-110 focus:outline-hidden",
+                  i < waterCount
+                    ? "text-blue-500 hover:bg-blue-500/10"
+                    : "text-muted-foreground/30 hover:text-blue-400 hover:bg-blue-500/5"
+                )}
+              >
+                {/* Reduced: w-6 h-6 -> w-5 h-5 */}
+                <GlassWater className={cn("w-5 h-5", i < waterCount && "fill-current")} />
+              </button>
+            ))}
+          </div>
+        </CardFooter>
       </Card>
 
       {/* Background decoration */}
