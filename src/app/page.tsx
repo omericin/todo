@@ -119,18 +119,30 @@ export default function TodoApp() {
   const playBeep = () => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      const playTone = (freq: number, startTime: number, duration: number) => {
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
 
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
 
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.5);
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(freq, startTime);
+
+        // Soft envelope
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+        oscillator.start(startTime);
+        oscillator.stop(startTime + duration);
+      };
+
+      const now = audioCtx.currentTime;
+      playTone(523.25, now, 1.0); // C5
+      playTone(659.25, now + 0.1, 0.8); // E5
+      playTone(783.99, now + 0.2, 0.6); // G5
     } catch (e) {
       console.error("Audio error", e);
     }
