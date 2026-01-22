@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "next-themes";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 type Priority = "low" | "medium" | "high";
 
@@ -33,6 +35,7 @@ export default function TodoApp() {
   const [priority, setPriority] = useState<Priority>("medium");
   const [mounted, setMounted] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
+  const [activeTab, setActiveTab] = useState("all");
 
   // Water Tracker State
   const [waterCount, setWaterCount] = useState(0);
@@ -64,7 +67,6 @@ export default function TodoApp() {
         if (date === today) {
           setWaterCount(count);
         } else {
-          // Reset if different day
           setWaterCount(0);
           localStorage.setItem("dailyWater", JSON.stringify({ date: today, count: 0 }));
         }
@@ -117,8 +119,24 @@ export default function TodoApp() {
     ));
   };
 
+  const cyclePriority = (id: string, current: Priority) => {
+    const sequence: Priority[] = ["low", "medium", "high"];
+    const next = sequence[(sequence.indexOf(current) + 1) % sequence.length];
+    setTodos(todos.map(t => t.id === id ? { ...t, priority: next } : t));
+  };
+
   const deleteTodo = (id: string) => {
     setTodos(todos.filter(t => t.id !== id));
+  };
+
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+
+    const items = Array.from(todos);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setTodos(items);
   };
 
   const getPriorityColor = (p: Priority) => {
@@ -131,27 +149,28 @@ export default function TodoApp() {
 
   const pendingCount = todos.filter(t => !t.completed).length;
 
-  const visibleTodos = hideCompleted
-    ? todos.filter(t => !t.completed)
-    : todos;
+  const filteredTodos = todos.filter(t => {
+    const matchesPriority = activeTab === "all" || t.priority === activeTab;
+    const matchesHide = !hideCompleted || !t.completed;
+    return matchesPriority && matchesHide;
+  });
 
   if (!mounted) {
-    return null; // Prevents hydration error
+    return null;
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 lg:p-8 selection:bg-primary/20 overflow-hidden">
-      <Card className="w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl border-white/20 dark:border-white/10 backdrop-blur-xl bg-card dark:bg-card/95">
-        <CardHeader className="space-y-1 shrink-0">
+    <div className="min-h-screen flex items-center justify-center p-4 lg:p-8 selection:bg-primary/20 overflow-hidden text-foreground bg-background transition-colors duration-300">
+      <Card className="w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl border-white/20 dark:border-zinc-800 backdrop-blur-xl bg-card dark:bg-card/95 overflow-hidden">
+        <CardHeader className="space-y-1 shrink-0 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2.5 bg-primary/10 rounded-xl">
                 <Layout className="w-6 h-6 text-primary" />
               </div>
               <div>
-                {/* Reduced: text-2xl -> text-xl */}
                 <CardTitle className="text-xl font-bold tracking-tight">Tasks</CardTitle>
-                <CardDescription className="text-xs">
+                <CardDescription className="text-[10px]">
                   Manage your daily tasks with focus and clarity.
                 </CardDescription>
               </div>
@@ -163,7 +182,7 @@ export default function TodoApp() {
                 size="sm"
                 onClick={() => setHideCompleted(!hideCompleted)}
                 className={cn(
-                  "hidden sm:flex h-8 text-xs font-medium border-primary/20 hover:bg-primary/5",
+                  "hidden sm:flex h-8 text-[10px] font-medium border-primary/20 hover:bg-primary/5",
                   hideCompleted && "bg-primary/10 text-primary border-primary/30"
                 )}
               >
@@ -179,8 +198,7 @@ export default function TodoApp() {
                   </>
                 )}
               </Button>
-              {/* Reduced: text-sm -> text-xs */}
-              <span className="text-xs text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
+              <span className="text-[10px] text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
                 {pendingCount} pending
               </span>
               <Button
@@ -196,8 +214,9 @@ export default function TodoApp() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 flex-1 flex flex-col min-h-0">
-          <form onSubmit={addTodo} className="space-y-4">
+
+        <CardContent className="space-y-4 flex-1 flex flex-col min-h-0 pt-0">
+          <form onSubmit={addTodo} className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
             <div className="flex flex-col gap-3">
               <div className="flex gap-3">
                 <div className="relative flex-1">
@@ -205,13 +224,11 @@ export default function TodoApp() {
                     placeholder="Add a new task..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    // Reduced: font-medium -> text-sm
-                    className="h-10 text-sm pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all"
+                    className="h-10 text-sm pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all bg-card/50"
                   />
                 </div>
                 <Button
                   type="button"
-                  draggable={false}
                   onClick={() => setShowDetailsInput(!showDetailsInput)}
                   variant={showDetailsInput ? "secondary" : "outline"}
                   className="h-10 px-3 border-primary/20"
@@ -224,7 +241,7 @@ export default function TodoApp() {
                   className="h-10 text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 transition-all px-4 shrink-0"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Task
+                  Add
                 </Button>
               </div>
 
@@ -233,7 +250,6 @@ export default function TodoApp() {
                   placeholder="Add details (optional)..."
                   value={details}
                   onChange={(e) => setDetails(e.target.value)}
-                  // Reduced: text-sm added
                   className="min-h-[80px] text-sm border-primary/20 resize-none animate-in slide-in-from-top-2 fade-in duration-200"
                 />
               )}
@@ -241,138 +257,147 @@ export default function TodoApp() {
 
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-4">
-                {/* Reduced: text-sm -> text-xs */}
-                <span className="text-xs text-muted-foreground font-medium">Priority:</span>
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Priority:</span>
                 <RadioGroup
                   value={priority}
                   onValueChange={(v) => setPriority(v as Priority)}
                   className="flex items-center gap-4"
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="low" id="low" className="text-blue-500 border-blue-200 dark:border-blue-800" />
-                    {/* Reduced: text-sm -> text-xs */}
-                    <Label htmlFor="low" className="text-xs font-normal cursor-pointer">Low</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="medium" id="medium" className="text-yellow-500 border-yellow-200 dark:border-yellow-800" />
-                    <Label htmlFor="medium" className="text-xs font-normal cursor-pointer">Medium</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="high" id="high" className="text-red-500 border-red-200 dark:border-red-800" />
-                    <Label htmlFor="high" className="text-xs font-normal cursor-pointer">High</Label>
-                  </div>
+                  {["low", "medium", "high"].map((p) => (
+                    <div key={p} className="flex items-center space-x-2">
+                      <RadioGroupItem value={p} id={`new-${p}`} className={cn(
+                        "w-4 h-4",
+                        p === "low" && "text-blue-500 border-blue-200",
+                        p === "medium" && "text-yellow-500 border-yellow-200",
+                        p === "high" && "text-red-500 border-red-200"
+                      )} />
+                      <Label htmlFor={`new-${p}`} className="text-[10px] font-medium cursor-pointer capitalize">{p}</Label>
+                    </div>
+                  ))}
                 </RadioGroup>
               </div>
-
-              {/* Mobile toggle button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setHideCompleted(!hideCompleted)}
-                className="sm:hidden h-8 w-8 p-0"
-              >
-                {hideCompleted ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                <span className="sr-only">Toggle completed tasks</span>
-              </Button>
             </div>
           </form>
 
-          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
-            {todos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground/50 space-y-4 min-h-[300px]">
-                <div className="w-20 h-20 rounded-full bg-secondary/50 flex items-center justify-center">
-                  <Check className="w-10 h-10 opacity-20" />
-                </div>
-                <p className="text-base font-medium">No tasks yet. Start by adding one!</p>
-              </div>
-            ) : visibleTodos.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground/50 space-y-4">
-                <div className="w-16 h-16 rounded-full bg-secondary/30 flex items-center justify-center">
-                  <EyeOff className="w-8 h-8 opacity-20" />
-                </div>
-                <p className="text-xs font-medium">Completed tasks are hidden.</p>
-              </div>
-            ) : (
-              visibleTodos.map((todo) => (
-                <Collapsible key={todo.id} className={cn(
-                  "group rounded-xl border transition-all duration-300 animate-in slide-in-from-bottom-2 fade-in",
-                  todo.completed
-                    ? "bg-secondary/30 border-transparent opacity-60"
-                    : "bg-card border-border hover:border-primary/30 hover:shadow-md hover:shadow-primary/5"
-                )}>
-                  <div className="flex items-center gap-4 p-4">
-                    <Checkbox
-                      checked={todo.completed}
-                      onCheckedChange={() => toggleTodo(todo.id)}
-                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-5 h-5 transition-transform active:scale-95 shrink-0"
-                    />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-secondary/50">
+              <TabsTrigger value="all" className="text-[10px] uppercase font-bold tracking-widest">All</TabsTrigger>
+              <TabsTrigger value="low" className="text-[10px] uppercase font-bold tracking-widest">Low</TabsTrigger>
+              <TabsTrigger value="medium" className="text-[10px] uppercase font-bold tracking-widest">Medium</TabsTrigger>
+              <TabsTrigger value="high" className="text-[10px] uppercase font-bold tracking-widest">High</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2 overflow-hidden">
-                      <span className={cn(
-                        // Reduced: text-base -> text-sm
-                        "text-sm font-medium transition-all truncate flex-1",
-                        todo.completed && "text-muted-foreground line-through decoration-primary/30"
-                      )}>
-                        {todo.text}
-                      </span>
-                      <div className="flex items-center gap-3 shrink-0">
-                        {/* Reduced: default badge size, ensured font-normal */}
-                        <Badge variant="outline" className={cn("text-[10px] px-2 py-0.5 font-normal border", getPriorityColor(todo.priority))}>
-                          {todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1)}
-                        </Badge>
-                        {/* Reduced: text-xs -> text-[10px] */}
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 min-w-[80px] justify-end">
-                          <Calendar className="w-3 h-3" />
-                          {todo.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="todos">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                    {filteredTodos.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/30">
+                        <Check className="w-12 h-12 mb-2 opacity-10" />
+                        <p className="text-xs font-medium uppercase tracking-widest">No tasks found</p>
                       </div>
-                    </div>
+                    ) : (
+                      filteredTodos.map((todo, index) => (
+                        <Draggable key={todo.id} draggableId={todo.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={cn(
+                                "group transition-all duration-200",
+                                snapshot.isDragging && "scale-[1.02] shadow-2xl z-50"
+                              )}
+                            >
+                              <Collapsible className={cn(
+                                "rounded-xl border transition-all duration-300",
+                                todo.completed
+                                  ? "bg-secondary/10 border-transparent opacity-50"
+                                  : "bg-card border-border hover:border-primary/50 hover:shadow-lg dark:hover:bg-zinc-900"
+                              )}>
+                                <div className="flex items-center gap-3 p-3">
+                                  <div {...provided.dragHandleProps} className="text-muted-foreground/30 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing">
+                                    <GripVertical className="w-4 h-4" />
+                                  </div>
 
-                    <div className="flex items-center gap-1">
-                      {todo.details && (
-                        <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                            <ChevronDown className="w-3 h-3 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                            <span className="sr-only">Toggle details</span>
-                          </Button>
-                        </CollapsibleTrigger>
-                      )}
+                                  <Checkbox
+                                    checked={todo.completed}
+                                    onCheckedChange={() => toggleTodo(todo.id)}
+                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-5 h-5 shrink-0"
+                                  />
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteTodo(todo.id)}
-                        className="opacity-0 group-hover:opacity-100 text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8 transition-all"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="sr-only">Delete</span>
-                      </Button>
-                    </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className={cn(
+                                      "text-sm font-medium transition-all block truncate",
+                                      todo.completed && "text-muted-foreground line-through decoration-primary/30"
+                                    )}>
+                                      {todo.text}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <Badge
+                                      variant="outline"
+                                      onClick={() => cyclePriority(todo.id, todo.priority)}
+                                      className={cn(
+                                        "text-[9px] px-2 py-0 cursor-pointer hover:scale-105 transition-transform active:scale-95 font-bold uppercase tracking-tighter border",
+                                        getPriorityColor(todo.priority)
+                                      )}
+                                    >
+                                      {todo.priority}
+                                    </Badge>
+
+                                    <div className="flex items-center gap-1">
+                                      {todo.details && (
+                                        <CollapsibleTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/50 hover:text-foreground">
+                                            <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                          </Button>
+                                        </CollapsibleTrigger>
+                                      )}
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => deleteTodo(todo.id)}
+                                        className="text-destructive/50 hover:text-destructive hover:bg-destructive/10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-all"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {todo.details && (
+                                  <CollapsibleContent>
+                                    <div className="px-3 pb-3 pl-12 pt-0">
+                                      <div className="text-[11px] text-muted-foreground bg-secondary/30 p-2 rounded-lg border border-border/30">
+                                        {todo.details}
+                                      </div>
+                                    </div>
+                                  </CollapsibleContent>
+                                )}
+                              </Collapsible>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))
+                    )}
+                    {provided.placeholder}
                   </div>
-
-                  {todo.details && (
-                    <CollapsibleContent>
-                      <div className="px-4 pb-4 pl-14 pt-0">
-                        {/* Reduced: text-sm -> text-xs */}
-                        <div className="text-xs text-muted-foreground bg-secondary/50 p-3 rounded-lg border border-border/50">
-                          {todo.details}
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  )}
-                </Collapsible>
-              ))
-            )}
+                )}
+              </Droppable>
+            </DragDropContext>
           </div>
         </CardContent>
+
         <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-2 shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-blue-500/10 rounded-lg">
               <GlassWater className="w-3.5 h-3.5 text-blue-500" />
             </div>
             <div>
-              {/* Reduced: text-sm -> text-xs, text-xs -> text-[10px] */}
-              <p className="text-xs font-semibold">Hydration Tracker</p>
+              <p className="text-[10px] font-semibold">Hydration Tracker</p>
               <p className="text-[10px] text-muted-foreground">{waterCount}/{DAILY_GOAL} glasses today</p>
             </div>
           </div>
@@ -382,7 +407,7 @@ export default function TodoApp() {
                 key={i}
                 onClick={() => setWaterCount(i + 1)}
                 className={cn(
-                  "p-1 rounded-md transition-all hover:scale-110 focus:outline-hidden",
+                  "p-1 rounded-md transition-all hover:scale-110 focus:outline-none",
                   i < waterCount
                     ? "text-blue-500 hover:bg-blue-500/10"
                     : "text-muted-foreground/30 hover:text-blue-400 hover:bg-blue-500/5"
@@ -395,8 +420,7 @@ export default function TodoApp() {
         </CardFooter>
       </Card>
 
-      {/* Background decoration */}
       <div className="fixed inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-    </div >
+    </div>
   );
 }
