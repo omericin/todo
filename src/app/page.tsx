@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon, GripVertical } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon, GripVertical, Play, Pause, RotateCcw, Volume2, VolumeX, Timer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTheme } from "next-themes";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
@@ -41,6 +42,12 @@ export default function TodoApp() {
   const [waterCount, setWaterCount] = useState(0);
   const DAILY_GOAL = 5;
   const { theme, setTheme } = useTheme();
+
+  // Timer State
+  const [defaultDuration, setDefaultDuration] = useState(25);
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Load Todos
   useEffect(() => {
@@ -92,6 +99,60 @@ export default function TodoApp() {
       localStorage.setItem("dailyWater", JSON.stringify({ date: today, count: waterCount }));
     }
   }, [waterCount, mounted]);
+
+  // Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      setIsRunning(false);
+      if (!isMuted) {
+        playBeep();
+      }
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, timeLeft, isMuted]);
+
+  const playBeep = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.5);
+    } catch (e) {
+      console.error("Audio error", e);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const toggleTimer = () => setIsRunning(!isRunning);
+  const resetTimer = () => {
+    setIsRunning(false);
+    setTimeLeft(defaultDuration * 60);
+  };
+
+  const changeDuration = (mins: number) => {
+    setIsRunning(false);
+    setDefaultDuration(mins);
+    setTimeLeft(mins * 60);
+  };
 
   const addTodo = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -177,30 +238,90 @@ export default function TodoApp() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setHideCompleted(!hideCompleted)}
-                className={cn(
-                  "hidden sm:flex h-8 text-[10px] font-medium border-primary/20 hover:bg-primary/5",
-                  hideCompleted && "bg-primary/10 text-primary border-primary/30"
-                )}
-              >
-                {hideCompleted ? (
-                  <>
-                    <EyeOff className="w-3.5 h-3.5 mr-1.5" />
-                    Show All
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-3.5 h-3.5 mr-1.5" />
-                    Hide Done
-                  </>
-                )}
-              </Button>
-              <span className="text-[10px] text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
-                {pendingCount} pending
-              </span>
+              {/* Compact Focus Timer in Header */}
+              <div className="flex items-center bg-secondary/50 rounded-full border border-border/50 p-0.5 pr-2 gap-1.5 animate-in fade-in zoom-in duration-500">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-primary hover:bg-primary/10">
+                      <Timer className="w-3.5 h-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-2" align="end">
+                    <div className="grid grid-cols-2 gap-1">
+                      {[5, 15, 25, 45, 60, 90].map((m) => (
+                        <Button
+                          key={m}
+                          variant={defaultDuration === m ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => changeDuration(m)}
+                          className="h-7 text-[10px] font-bold"
+                        >
+                          {m}m
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        type="number"
+                        placeholder="Min"
+                        className="h-7 text-[10px] px-2 w-full"
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val > 0) changeDuration(val);
+                        }}
+                      />
+                    </div>
+                    <div className="border-t mt-2 pt-2 flex justify-between px-1">
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMuted(!isMuted)}>
+                        {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={resetTimer}>
+                        <RotateCcw className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <span className={cn(
+                  "text-[11px] font-mono font-bold tabular-nums min-w-[34px]",
+                  isRunning && "animate-pulse text-primary"
+                )}>
+                  {formatTime(timeLeft)}
+                </span>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTimer}
+                  className={cn(
+                    "h-6 w-6 rounded-full",
+                    isRunning ? "text-amber-500 hover:bg-amber-500/10" : "text-primary hover:bg-primary/10"
+                  )}
+                >
+                  {isRunning ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-1.5 hidden sm:flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setHideCompleted(!hideCompleted)}
+                  className={cn(
+                    "h-8 text-[10px] font-medium border-primary/20 hover:bg-primary/5 px-2.5",
+                    hideCompleted && "bg-primary/10 text-primary border-primary/30"
+                  )}
+                >
+                  {hideCompleted ? (
+                    <><EyeOff className="w-3.5 h-3.5 mr-1.5" /> Show All</>
+                  ) : (
+                    <><Eye className="w-3.5 h-3.5 mr-1.5" /> Hide Done</>
+                  )}
+                </Button>
+                <span className="text-[10px] text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50 truncate">
+                  {pendingCount} pending
+                </span>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -278,6 +399,13 @@ export default function TodoApp() {
               </div>
             </div>
           </form>
+
+
+
+
+
+
+
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-secondary/50">
@@ -421,6 +549,6 @@ export default function TodoApp() {
       </Card>
 
       <div className="fixed inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-    </div>
+    </div >
   );
 }
