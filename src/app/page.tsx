@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useTheme } from "next-themes";
 
 type Priority = "low" | "medium" | "high";
 
@@ -36,6 +37,7 @@ export default function TodoApp() {
   // Water Tracker State
   const [waterCount, setWaterCount] = useState(0);
   const DAILY_GOAL = 5;
+  const { theme, setTheme } = useTheme();
 
   // Load Todos
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function TodoApp() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 lg:p-8 selection:bg-primary/20 overflow-hidden">
-      <Card className="w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl border-white/20 dark:border-white/10 backdrop-blur-xl bg-card/80">
+      <Card className="w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl border-white/20 dark:border-white/10 backdrop-blur-xl bg-card dark:bg-card/95">
         <CardHeader className="space-y-1 shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -181,6 +183,16 @@ export default function TodoApp() {
               <span className="text-xs text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50">
                 {pendingCount} pending
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -353,10 +365,10 @@ export default function TodoApp() {
             )}
           </div>
         </CardContent>
-        <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-3 shrink-0">
+        <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-2 shrink-0">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-blue-500/10 rounded-lg">
-              <GlassWater className="w-4 h-4 text-blue-500" />
+              <GlassWater className="w-3.5 h-3.5 text-blue-500" />
             </div>
             <div>
               {/* Reduced: text-sm -> text-xs, text-xs -> text-[10px] */}
@@ -370,14 +382,13 @@ export default function TodoApp() {
                 key={i}
                 onClick={() => setWaterCount(i + 1)}
                 className={cn(
-                  "p-1.5 rounded-lg transition-all hover:scale-110 focus:outline-hidden",
+                  "p-1 rounded-md transition-all hover:scale-110 focus:outline-hidden",
                   i < waterCount
                     ? "text-blue-500 hover:bg-blue-500/10"
                     : "text-muted-foreground/30 hover:text-blue-400 hover:bg-blue-500/5"
                 )}
               >
-                {/* Reduced: w-6 h-6 -> w-5 h-5 */}
-                <GlassWater className={cn("w-5 h-5", i < waterCount && "fill-current")} />
+                <GlassWater className={cn("w-4 h-4", i < waterCount && "fill-current")} />
               </button>
             ))}
           </div>
@@ -386,6 +397,6 @@ export default function TodoApp() {
 
       {/* Background decoration */}
       <div className="fixed inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-    </div>
+    </div >
   );
 }
