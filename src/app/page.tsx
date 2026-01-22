@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon, GripVertical, Play, Pause, RotateCcw, Volume2, VolumeX, Timer } from "lucide-react";
+import { Plus, Check, Trash2, Calendar, Layout, ChevronDown, AlignLeft, Eye, EyeOff, GlassWater, Sun, Moon, GripVertical, Play, Pause, RotateCcw, Volume2, VolumeX, Timer, StickyNote, Palette, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTheme } from "next-themes";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
@@ -28,6 +28,13 @@ interface Todo {
   createdAt: Date;
 }
 
+interface StickyNote {
+  id: string;
+  content: string;
+  color: string;
+  createdAt: Date;
+}
+
 export default function TodoApp() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [input, setInput] = useState("");
@@ -37,6 +44,12 @@ export default function TodoApp() {
   const [mounted, setMounted] = useState(false);
   const [hideCompleted, setHideCompleted] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
+  const [mainTab, setMainTab] = useState<"tasks" | "notes">("tasks");
+
+  // Sticky Notes State
+  const [notes, setNotes] = useState<StickyNote[]>([]);
+  const [noteInput, setNoteInput] = useState("");
+  const [noteColor, setNoteColor] = useState("bg-yellow-200 dark:bg-yellow-900/40");
 
   // Water Tracker State
   const [waterCount, setWaterCount] = useState(0);
@@ -82,6 +95,20 @@ export default function TodoApp() {
       }
     }
 
+    // Load Sticky Notes
+    const savedNotes = localStorage.getItem("stickyNotes");
+    if (savedNotes) {
+      try {
+        const parsed = JSON.parse(savedNotes);
+        setNotes(parsed.map((n: any) => ({
+          ...n,
+          createdAt: new Date(n.createdAt)
+        })));
+      } catch (e) {
+        console.error("Failed to load sticky notes", e);
+      }
+    }
+
     setMounted(true);
   }, []);
 
@@ -99,6 +126,13 @@ export default function TodoApp() {
       localStorage.setItem("dailyWater", JSON.stringify({ date: today, count: waterCount }));
     }
   }, [waterCount, mounted]);
+
+  // Save Sticky Notes
+  useEffect(() => {
+    if (mounted) {
+      localStorage.setItem("stickyNotes", JSON.stringify(notes));
+    }
+  }, [notes, mounted]);
 
   // Timer Logic
   useEffect(() => {
@@ -212,6 +246,22 @@ export default function TodoApp() {
     setTodos(items);
   };
 
+  const addNote = () => {
+    if (!noteInput.trim()) return;
+    const newNote: StickyNote = {
+      id: Date.now().toString(),
+      content: noteInput,
+      color: noteColor,
+      createdAt: new Date(),
+    };
+    setNotes([newNote, ...notes]);
+    setNoteInput("");
+  };
+
+  const deleteNote = (id: string) => {
+    setNotes(notes.filter(n => n.id !== id));
+  };
+
   const getPriorityColor = (p: Priority) => {
     switch (p) {
       case "high": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900";
@@ -233,334 +283,444 @@ export default function TodoApp() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 lg:p-8 selection:bg-primary/20 overflow-hidden text-foreground bg-background transition-colors duration-300">
-      <Card className="w-full max-w-4xl h-[90vh] flex flex-col shadow-2xl border-white/20 dark:border-zinc-800 backdrop-blur-xl bg-card dark:bg-card/95 overflow-hidden">
-        <CardHeader className="space-y-1 shrink-0 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-primary/10 rounded-xl">
-                <Layout className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <CardTitle className="text-xl font-bold tracking-tight">Tasks</CardTitle>
-                <CardDescription className="text-[10px]">
-                  Manage your daily tasks with focus and clarity.
-                </CardDescription>
-              </div>
-            </div>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 lg:p-8 selection:bg-primary/20 overflow-hidden text-foreground bg-background transition-colors duration-300">
+      <Tabs defaultValue="tasks" className="w-full max-w-4xl h-[90vh] flex flex-col items-center">
+        <TabsList className="mb-6 h-11 p-1 bg-secondary/50 backdrop-blur-xl border border-white/10 shadow-xl rounded-2xl w-[320px] grid grid-cols-2 shrink-0">
+          <TabsTrigger value="tasks" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold tracking-tight">
+            <Layout className="w-4 h-4 mr-2" /> Tasks
+          </TabsTrigger>
+          <TabsTrigger value="notes" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-bold tracking-tight">
+            <StickyNote className="w-4 h-4 mr-2" /> Notes
+          </TabsTrigger>
+        </TabsList>
 
-            <div className="flex items-center gap-3">
-              {/* Compact Focus Timer in Header */}
-              <div className="flex items-center bg-secondary/50 rounded-full border border-border/50 p-0.5 pr-2 gap-1.5 animate-in fade-in zoom-in duration-500">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-primary hover:bg-primary/10">
-                      <Timer className="w-3.5 h-3.5" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-40 p-2" align="end">
-                    <div className="grid grid-cols-2 gap-1">
-                      {[5, 15, 25, 45, 60, 90].map((m) => (
-                        <Button
-                          key={m}
-                          variant={defaultDuration === m ? "default" : "ghost"}
-                          size="sm"
-                          onClick={() => changeDuration(m)}
-                          className="h-7 text-[10px] font-bold"
-                        >
-                          {m}m
+        <TabsContent value="tasks" className="w-full flex-1 min-h-0 focus-visible:outline-none">
+          <Card className="w-full h-full flex flex-col shadow-2xl border-white/20 dark:border-zinc-800 backdrop-blur-xl bg-card dark:bg-card/95 overflow-hidden">
+            <CardHeader className="space-y-1 shrink-0 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-primary/10 rounded-xl">
+                    <Layout className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold tracking-tight">Tasks</CardTitle>
+                    <CardDescription className="text-[10px]">
+                      Manage your daily tasks with focus and clarity.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Compact Focus Timer in Header */}
+                  <div className="flex items-center bg-secondary/50 rounded-full border border-border/50 p-0.5 pr-2 gap-1.5 animate-in fade-in zoom-in duration-500">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full text-primary hover:bg-primary/10">
+                          <Timer className="w-3.5 h-3.5" />
                         </Button>
-                      ))}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
+                      </PopoverTrigger>
+                      <PopoverContent className="w-40 p-2" align="end">
+                        <div className="grid grid-cols-2 gap-1">
+                          {[5, 15, 25, 45, 60, 90].map((m) => (
+                            <Button
+                              key={m}
+                              variant={defaultDuration === m ? "default" : "ghost"}
+                              size="sm"
+                              onClick={() => changeDuration(m)}
+                              className="h-7 text-[10px] font-bold"
+                            >
+                              {m}m
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Min"
+                            className="h-7 text-[10px] px-2 w-full"
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              if (!isNaN(val) && val > 0) changeDuration(val);
+                            }}
+                          />
+                        </div>
+                        <div className="border-t mt-2 pt-2 flex justify-between px-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMuted(!isMuted)}>
+                            {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={resetTimer}>
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+
+                    <span className={cn(
+                      "text-[11px] font-mono font-bold tabular-nums min-w-[34px]",
+                      isRunning && "animate-pulse text-primary"
+                    )}>
+                      {formatTime(timeLeft)}
+                    </span>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleTimer}
+                      className={cn(
+                        "h-6 w-6 rounded-full",
+                        isRunning ? "text-amber-500 hover:bg-amber-500/10" : "text-primary hover:bg-primary/10"
+                      )}
+                    >
+                      {isRunning ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 hidden sm:flex">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHideCompleted(!hideCompleted)}
+                      className={cn(
+                        "h-8 text-[10px] font-medium border-primary/20 hover:bg-primary/5 px-2.5",
+                        hideCompleted && "bg-primary/10 text-primary border-primary/30"
+                      )}
+                    >
+                      {hideCompleted ? (
+                        <><EyeOff className="w-3.5 h-3.5 mr-1.5" /> Show All</>
+                      ) : (
+                        <><Eye className="w-3.5 h-3.5 mr-1.5" /> Hide Done</>
+                      )}
+                    </Button>
+                    <span className="text-[10px] text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50 truncate">
+                      {pendingCount} pending
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                    <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                    <span className="sr-only">Toggle theme</span>
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="space-y-4 flex-1 flex flex-col min-h-0 pt-0">
+              <form onSubmit={addTodo} className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
+                <div className="flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
                       <Input
-                        type="number"
-                        placeholder="Min"
-                        className="h-7 text-[10px] px-2 w-full"
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          if (!isNaN(val) && val > 0) changeDuration(val);
-                        }}
+                        placeholder="Add a new task..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        className="h-10 text-sm pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all bg-card/50"
                       />
                     </div>
-                    <div className="border-t mt-2 pt-2 flex justify-between px-1">
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsMuted(!isMuted)}>
-                        {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={resetTimer}>
-                        <RotateCcw className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    <Button
+                      type="button"
+                      onClick={() => setShowDetailsInput(!showDetailsInput)}
+                      variant={showDetailsInput ? "secondary" : "outline"}
+                      className="h-10 px-3 border-primary/20"
+                    >
+                      <AlignLeft className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!input.trim()}
+                      className="h-10 text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 transition-all px-4 shrink-0"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add
+                    </Button>
+                  </div>
 
-                <span className={cn(
-                  "text-[11px] font-mono font-bold tabular-nums min-w-[34px]",
-                  isRunning && "animate-pulse text-primary"
-                )}>
-                  {formatTime(timeLeft)}
-                </span>
+                  {showDetailsInput && (
+                    <Textarea
+                      placeholder="Add details (optional)..."
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      className="min-h-[80px] text-sm border-primary/20 resize-none animate-in slide-in-from-top-2 fade-in duration-200"
+                    />
+                  )}
+                </div>
 
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-4">
+                    <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Priority:</span>
+                    <RadioGroup
+                      value={priority}
+                      onValueChange={(v) => setPriority(v as Priority)}
+                      className="flex items-center gap-4"
+                    >
+                      {["low", "medium", "high"].map((p) => (
+                        <div key={p} className="flex items-center space-x-2">
+                          <RadioGroupItem value={p} id={`new-${p}`} className={cn(
+                            "w-4 h-4",
+                            p === "low" && "text-blue-500 border-blue-200",
+                            p === "medium" && "text-yellow-500 border-yellow-200",
+                            p === "high" && "text-red-500 border-red-200"
+                          )} />
+                          <Label htmlFor={`new-${p}`} className="text-[10px] font-medium cursor-pointer capitalize">{p}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                </div>
+              </form>
+
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-secondary/50">
+                  <TabsTrigger value="all" className="text-[10px] uppercase font-bold tracking-widest">All</TabsTrigger>
+                  <TabsTrigger value="low" className="text-[10px] uppercase font-bold tracking-widest">Low</TabsTrigger>
+                  <TabsTrigger value="medium" className="text-[10px] uppercase font-bold tracking-widest">Medium</TabsTrigger>
+                  <TabsTrigger value="high" className="text-[10px] uppercase font-bold tracking-widest">High</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                <DragDropContext onDragEnd={onDragEnd}>
+                  <Droppable droppableId="todos">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
+                        {filteredTodos.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/30">
+                            <Check className="w-12 h-12 mb-2 opacity-10" />
+                            <p className="text-xs font-medium uppercase tracking-widest">No tasks found</p>
+                          </div>
+                        ) : (
+                          filteredTodos.map((todo, index) => (
+                            <Draggable key={todo.id} draggableId={todo.id} index={index}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={cn(
+                                    "group transition-all duration-200",
+                                    snapshot.isDragging && "scale-[1.02] shadow-2xl z-50"
+                                  )}
+                                >
+                                  <Collapsible className={cn(
+                                    "rounded-xl border transition-all duration-300",
+                                    todo.completed
+                                      ? "bg-secondary/10 border-transparent opacity-50"
+                                      : "bg-card border-border hover:border-primary/50 hover:shadow-lg dark:hover:bg-zinc-900"
+                                  )}>
+                                    <div className="flex items-center gap-3 p-3">
+                                      <div {...provided.dragHandleProps} className="text-muted-foreground/30 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing">
+                                        <GripVertical className="w-4 h-4" />
+                                      </div>
+
+                                      <Checkbox
+                                        checked={todo.completed}
+                                        onCheckedChange={() => toggleTodo(todo.id)}
+                                        className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-5 h-5 shrink-0"
+                                      />
+
+                                      <div className="flex-1 min-w-0">
+                                        <span className={cn(
+                                          "text-sm font-medium transition-all block truncate",
+                                          todo.completed && "text-muted-foreground line-through decoration-primary/30"
+                                        )}>
+                                          {todo.text}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 shrink-0">
+                                        <Badge
+                                          variant="outline"
+                                          onClick={() => cyclePriority(todo.id, todo.priority)}
+                                          className={cn(
+                                            "text-[9px] px-2 py-0 cursor-pointer hover:scale-105 transition-transform active:scale-95 font-bold uppercase tracking-tighter border",
+                                            getPriorityColor(todo.priority)
+                                          )}
+                                        >
+                                          {todo.priority}
+                                        </Badge>
+
+                                        <div className="flex items-center gap-1">
+                                          {todo.details && (
+                                            <CollapsibleTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/50 hover:text-foreground">
+                                                <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                                              </Button>
+                                            </CollapsibleTrigger>
+                                          )}
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => deleteTodo(todo.id)}
+                                            className="text-destructive/50 hover:text-destructive hover:bg-destructive/10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-all"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {todo.details && (
+                                      <CollapsibleContent>
+                                        <div className="px-3 pb-3 pl-12 pt-0">
+                                          <div className="text-[11px] text-muted-foreground bg-secondary/30 p-2 rounded-lg border border-border/30">
+                                            {todo.details}
+                                          </div>
+                                        </div>
+                                      </CollapsibleContent>
+                                    )}
+                                  </Collapsible>
+                                </div>
+                              )}
+                            </Draggable>
+                          ))
+                        )}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              </div>
+            </CardContent>
+
+            <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-2 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-500/10 rounded-lg">
+                  <GlassWater className="w-3.5 h-3.5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold">Hydration Tracker</p>
+                  <p className="text-[10px] text-muted-foreground">{waterCount}/{DAILY_GOAL} glasses today</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: DAILY_GOAL }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setWaterCount(i + 1)}
+                    className={cn(
+                      "p-1 rounded-md transition-all hover:scale-110 focus:outline-none",
+                      i < waterCount
+                        ? "text-blue-500 hover:bg-blue-500/10"
+                        : "text-muted-foreground/30 hover:text-blue-400 hover:bg-blue-500/5"
+                    )}
+                  >
+                    <GlassWater className={cn("w-4 h-4", i < waterCount && "fill-current")} />
+                  </button>
+                ))}
+              </div>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notes" className="w-full flex-1 min-h-0 focus-visible:outline-none">
+          <Card className="w-full h-full flex flex-col shadow-2xl border-white/20 dark:border-zinc-800 backdrop-blur-xl bg-card dark:bg-card/95 overflow-hidden">
+            <CardHeader className="shrink-0 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-primary/10 rounded-xl">
+                    <StickyNote className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold tracking-tight">Sticky Notes</CardTitle>
+                    <CardDescription className="text-[10px]">Quick thoughts and reminders.</CardDescription>
+                  </div>
+                </div>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={toggleTimer}
-                  className={cn(
-                    "h-6 w-6 rounded-full",
-                    isRunning ? "text-amber-500 hover:bg-amber-500/10" : "text-primary hover:bg-primary/10"
-                  )}
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 >
-                  {isRunning ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current ml-0.5" />}
+                  <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                  <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
                 </Button>
               </div>
+            </CardHeader>
 
-              <div className="flex items-center gap-1.5 hidden sm:flex">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setHideCompleted(!hideCompleted)}
-                  className={cn(
-                    "h-8 text-[10px] font-medium border-primary/20 hover:bg-primary/5 px-2.5",
-                    hideCompleted && "bg-primary/10 text-primary border-primary/30"
-                  )}
-                >
-                  {hideCompleted ? (
-                    <><EyeOff className="w-3.5 h-3.5 mr-1.5" /> Show All</>
-                  ) : (
-                    <><Eye className="w-3.5 h-3.5 mr-1.5" /> Hide Done</>
-                  )}
-                </Button>
-                <span className="text-[10px] text-muted-foreground font-medium bg-secondary px-3 py-1 rounded-full border border-border/50 truncate">
-                  {pendingCount} pending
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              >
-                <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-4 flex-1 flex flex-col min-h-0 pt-0">
-          <form onSubmit={addTodo} className="space-y-3 bg-secondary/20 p-4 rounded-xl border border-border/50">
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <Input
-                    placeholder="Add a new task..."
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    className="h-10 text-sm pr-4 border-primary/20 focus-visible:ring-primary/30 transition-all bg-card/50"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  onClick={() => setShowDetailsInput(!showDetailsInput)}
-                  variant={showDetailsInput ? "secondary" : "outline"}
-                  className="h-10 px-3 border-primary/20"
-                >
-                  <AlignLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!input.trim()}
-                  className="h-10 text-sm bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 transition-all px-4 shrink-0"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add
-                </Button>
-              </div>
-
-              {showDetailsInput && (
+            <CardContent className="flex-1 overflow-hidden flex flex-col pt-0 space-y-4">
+              <div className="bg-secondary/20 p-4 rounded-xl border border-border/50 space-y-3">
                 <Textarea
-                  placeholder="Add details (optional)..."
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
-                  className="min-h-[80px] text-sm border-primary/20 resize-none animate-in slide-in-from-top-2 fade-in duration-200"
+                  placeholder="Write a quick note..."
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  className="min-h-[100px] bg-card/50 border-primary/20 focus-visible:ring-primary/30 resize-none font-medium placeholder:font-normal"
                 />
-              )}
-            </div>
-
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-4">
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Priority:</span>
-                <RadioGroup
-                  value={priority}
-                  onValueChange={(v) => setPriority(v as Priority)}
-                  className="flex items-center gap-4"
-                >
-                  {["low", "medium", "high"].map((p) => (
-                    <div key={p} className="flex items-center space-x-2">
-                      <RadioGroupItem value={p} id={`new-${p}`} className={cn(
-                        "w-4 h-4",
-                        p === "low" && "text-blue-500 border-blue-200",
-                        p === "medium" && "text-yellow-500 border-yellow-200",
-                        p === "high" && "text-red-500 border-red-200"
-                      )} />
-                      <Label htmlFor={`new-${p}`} className="text-[10px] font-medium cursor-pointer capitalize">{p}</Label>
-                    </div>
-                  ))}
-                </RadioGroup>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {[
+                      "bg-yellow-200 dark:bg-yellow-900/40",
+                      "bg-blue-200 dark:bg-blue-900/40",
+                      "bg-green-200 dark:bg-green-900/40",
+                      "bg-pink-200 dark:bg-pink-900/40",
+                      "bg-purple-200 dark:bg-purple-900/40"
+                    ].map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setNoteColor(color)}
+                        className={cn(
+                          "w-6 h-6 rounded-full border-2 transition-all",
+                          color.split(" ")[1],
+                          noteColor === color ? "border-primary scale-110 shadow-lg" : "border-transparent hover:scale-105"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <Button onClick={addNote} disabled={!noteInput.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 font-bold transition-all px-6">
+                    <Plus className="w-4 h-4 mr-2" /> Add Note
+                  </Button>
+                </div>
               </div>
-            </div>
-          </form>
 
-
-
-
-
-
-
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-9 p-1 bg-secondary/50">
-              <TabsTrigger value="all" className="text-[10px] uppercase font-bold tracking-widest">All</TabsTrigger>
-              <TabsTrigger value="low" className="text-[10px] uppercase font-bold tracking-widest">Low</TabsTrigger>
-              <TabsTrigger value="medium" className="text-[10px] uppercase font-bold tracking-widest">Medium</TabsTrigger>
-              <TabsTrigger value="high" className="text-[10px] uppercase font-bold tracking-widest">High</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <DragDropContext onDragEnd={onDragEnd}>
-              <Droppable droppableId="todos">
-                {(provided) => (
-                  <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-                    {filteredTodos.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/30">
-                        <Check className="w-12 h-12 mb-2 opacity-10" />
-                        <p className="text-xs font-medium uppercase tracking-widest">No tasks found</p>
+              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+                {notes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/30 h-full">
+                    <div className="p-6 bg-secondary/10 rounded-full mb-4">
+                      <StickyNote className="w-12 h-12 opacity-10" />
+                    </div>
+                    <p className="text-xs font-medium uppercase tracking-widest">No notes yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-4">
+                    {notes.map((note) => (
+                      <div
+                        key={note.id}
+                        className={cn(
+                          "group relative p-5 rounded-2xl shadow-md border border-white/20 transition-all hover:shadow-2xl hover:-translate-y-1 animate-in fade-in zoom-in duration-300",
+                          note.color,
+                          "rotate-1 hover:rotate-0"
+                        )}
+                      >
+                        <button
+                          onClick={() => deleteNote(note.id)}
+                          className="absolute top-3 right-3 p-1.5 rounded-full bg-black/5 hover:bg-red-500 hover:text-white text-black/40 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        <p className="text-sm font-medium text-black/80 dark:text-zinc-100 whitespace-pre-wrap leading-relaxed">
+                          {note.content}
+                        </p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <div className="text-[9px] font-black uppercase tracking-widest text-black/30 dark:text-zinc-400/40">
+                            {note.createdAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </div>
+                          <div className="p-1 bg-black/5 rounded-md">
+                            <StickyNote className="w-3 h-3 text-black/20" />
+                          </div>
+                        </div>
                       </div>
-                    ) : (
-                      filteredTodos.map((todo, index) => (
-                        <Draggable key={todo.id} draggableId={todo.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={cn(
-                                "group transition-all duration-200",
-                                snapshot.isDragging && "scale-[1.02] shadow-2xl z-50"
-                              )}
-                            >
-                              <Collapsible className={cn(
-                                "rounded-xl border transition-all duration-300",
-                                todo.completed
-                                  ? "bg-secondary/10 border-transparent opacity-50"
-                                  : "bg-card border-border hover:border-primary/50 hover:shadow-lg dark:hover:bg-zinc-900"
-                              )}>
-                                <div className="flex items-center gap-3 p-3">
-                                  <div {...provided.dragHandleProps} className="text-muted-foreground/30 hover:text-muted-foreground transition-colors cursor-grab active:cursor-grabbing">
-                                    <GripVertical className="w-4 h-4" />
-                                  </div>
-
-                                  <Checkbox
-                                    checked={todo.completed}
-                                    onCheckedChange={() => toggleTodo(todo.id)}
-                                    className="data-[state=checked]:bg-primary data-[state=checked]:border-primary w-5 h-5 shrink-0"
-                                  />
-
-                                  <div className="flex-1 min-w-0">
-                                    <span className={cn(
-                                      "text-sm font-medium transition-all block truncate",
-                                      todo.completed && "text-muted-foreground line-through decoration-primary/30"
-                                    )}>
-                                      {todo.text}
-                                    </span>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <Badge
-                                      variant="outline"
-                                      onClick={() => cyclePriority(todo.id, todo.priority)}
-                                      className={cn(
-                                        "text-[9px] px-2 py-0 cursor-pointer hover:scale-105 transition-transform active:scale-95 font-bold uppercase tracking-tighter border",
-                                        getPriorityColor(todo.priority)
-                                      )}
-                                    >
-                                      {todo.priority}
-                                    </Badge>
-
-                                    <div className="flex items-center gap-1">
-                                      {todo.details && (
-                                        <CollapsibleTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground/50 hover:text-foreground">
-                                            <ChevronDown className="w-3.5 h-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                                          </Button>
-                                        </CollapsibleTrigger>
-                                      )}
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => deleteTodo(todo.id)}
-                                        className="text-destructive/50 hover:text-destructive hover:bg-destructive/10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-all"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {todo.details && (
-                                  <CollapsibleContent>
-                                    <div className="px-3 pb-3 pl-12 pt-0">
-                                      <div className="text-[11px] text-muted-foreground bg-secondary/30 p-2 rounded-lg border border-border/30">
-                                        {todo.details}
-                                      </div>
-                                    </div>
-                                  </CollapsibleContent>
-                                )}
-                              </Collapsible>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))
-                    )}
-                    {provided.placeholder}
+                    ))}
                   </div>
                 )}
-              </Droppable>
-            </DragDropContext>
-          </div>
-        </CardContent>
-
-        <CardFooter className="bg-secondary/30 mt-auto border-t flex flex-col sm:flex-row items-center justify-between gap-4 py-2 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-blue-500/10 rounded-lg">
-              <GlassWater className="w-3.5 h-3.5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold">Hydration Tracker</p>
-              <p className="text-[10px] text-muted-foreground">{waterCount}/{DAILY_GOAL} glasses today</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {Array.from({ length: DAILY_GOAL }).map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setWaterCount(i + 1)}
-                className={cn(
-                  "p-1 rounded-md transition-all hover:scale-110 focus:outline-none",
-                  i < waterCount
-                    ? "text-blue-500 hover:bg-blue-500/10"
-                    : "text-muted-foreground/30 hover:text-blue-400 hover:bg-blue-500/5"
-                )}
-              >
-                <GlassWater className={cn("w-4 h-4", i < waterCount && "fill-current")} />
-              </button>
-            ))}
-          </div>
-        </CardFooter>
-      </Card>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <div className="fixed inset-0 -z-10 h-full w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]"></div>
-    </div >
+    </div>
   );
 }
